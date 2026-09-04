@@ -3,10 +3,13 @@ import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { campaigns, candidates } from "@/db/schema";
+import { E164_REGEX } from "@/lib/phone";
 
 const addCandidateSchema = z.object({
   name: z.string().min(2),
-  phone: z.string().min(6),
+  phone: z
+    .string()
+    .regex(E164_REGEX, "Phone must be E.164 format: + followed by country code and number, e.g. +917411771293"),
   email: z.string().email().optional().or(z.literal("")),
   roleTitle: z.string().optional(),
   location: z.string().optional(),

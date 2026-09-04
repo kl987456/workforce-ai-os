@@ -16,6 +16,8 @@ import {
 } from "@/components/ui/dialog";
 import { Phone, Loader2 } from "lucide-react";
 import type { CandidateDTO } from "./types";
+import { isE164, phoneHint } from "@/lib/phone";
+import { cn } from "@/lib/utils";
 
 export function TriggerCallDialog({
   candidate,
@@ -32,6 +34,8 @@ export function TriggerCallDialog({
   const [phone, setPhone] = useState(candidate.phone);
   const [loading, setLoading] = useState(false);
   const isSeeded = candidate.source === "SEEDED_SEARCH";
+  const hint = phoneHint(phone);
+  const valid = isE164(phone);
 
   async function handleCall() {
     setLoading(true);
@@ -81,19 +85,28 @@ export function TriggerCallDialog({
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-2">
-          <Label htmlFor="phone">Phone number (E.164 format)</Label>
+          <Label htmlFor="phone">Phone number (E.164 format — works for any country)</Label>
           <Input
             id="phone"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
-            placeholder="+15551234567"
+            placeholder="+917411771293 or +15551234567"
+            className={cn(hint && "border-destructive focus-visible:ring-destructive/40")}
           />
+          {hint ? (
+            <p className="text-xs text-destructive">{hint}</p>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              Always starts with + and the country code — +91 for India, +1 for US/Canada, +44
+              for UK, etc. No spaces or dashes.
+            </p>
+          )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)} disabled={loading}>
             Cancel
           </Button>
-          <Button onClick={handleCall} disabled={loading || !phone}>
+          <Button onClick={handleCall} disabled={loading || !valid}>
             {loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
             Place call
           </Button>

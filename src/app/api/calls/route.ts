@@ -5,6 +5,7 @@ import { getDb } from "@/db";
 import { calls, candidates, campaigns } from "@/db/schema";
 import { getOrCreateDefaultAgent } from "@/lib/hunar/ensure-agent";
 import { hunar, HunarApiError } from "@/lib/hunar/client";
+import { E164_REGEX } from "@/lib/phone";
 
 const createCallSchema = z.object({
   candidateId: z.string().uuid(),
@@ -57,9 +58,9 @@ export async function POST(req: NextRequest) {
   const agent = await getOrCreateDefaultAgent(purpose);
 
   const phone = phoneOverride ?? candidate.phone;
-  if (!/^\+[1-9]\d{6,14}$/.test(phone)) {
+  if (!E164_REGEX.test(phone)) {
     return NextResponse.json(
-      { error: "Phone number must be in E.164 format, e.g. +15551234567" },
+      { error: "Phone number must be in E.164 format: + followed by country code and number, e.g. +917411771293" },
       { status: 422 }
     );
   }

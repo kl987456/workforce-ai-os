@@ -23,6 +23,8 @@ import { CampaignPicker } from "@/components/workforce/campaign-picker";
 import { CandidateList } from "@/components/workforce/candidate-list";
 import { CallList } from "@/components/workforce/call-list";
 import { useCampaignWorkspace } from "@/components/workforce/use-campaign-workspace";
+import { isE164, phoneHint } from "@/lib/phone";
+import { cn } from "@/lib/utils";
 
 function NewRequisitionDialog({ onCreated }: { onCreated: (id: string) => void }) {
   const [open, setOpen] = useState(false);
@@ -136,10 +138,15 @@ function AddCandidateDialog({
   const [email, setEmail] = useState("");
   const [role, setRole] = useState(defaultRole);
   const [loading, setLoading] = useState(false);
+  const hint = phoneHint(phone);
 
   async function handleAdd() {
     if (!name || !phone) {
       toast.error("Name and phone number are required");
+      return;
+    }
+    if (!isE164(phone)) {
+      toast.error("Phone number isn't valid yet", { description: hint ?? undefined });
       return;
     }
     setLoading(true);
@@ -186,8 +193,21 @@ function AddCandidateDialog({
             <Input id="c-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Jordan Lee" />
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="c-phone">Phone (E.164)</Label>
-            <Input id="c-phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+15551234567" />
+            <Label htmlFor="c-phone">Phone (E.164 — any country)</Label>
+            <Input
+              id="c-phone"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="+917411771293 or +15551234567"
+              className={cn(hint && "border-destructive focus-visible:ring-destructive/40")}
+            />
+            {hint ? (
+              <p className="text-xs text-destructive">{hint}</p>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                + and country code, no spaces — +91 India, +1 US/Canada, +44 UK, etc.
+              </p>
+            )}
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="c-email">Email (optional)</Label>
