@@ -25,6 +25,7 @@ export async function GET(
     db.query.calls.findMany({
       where: eq(calls.campaignId, id),
       orderBy: [desc(calls.createdAt)],
+      with: { candidate: true },
     }),
   ]);
 

@@ -60,6 +60,15 @@ required), so webhook-delivered results only show up on the deployed URL.
 Useful scripts: `npm run db:studio` (Drizzle Studio), `npm run db:reset-demo` (clears
 campaigns/candidates/calls, keeps the cached Hunar agents).
 
+To verify the webhook receiver (signature verification + DB write) without placing a real call:
+
+```bash
+npx dotenv -e .env.local -- node scripts/simulate-webhook.mjs <app-url> <call-row-id>
+```
+
+This was used to confirm the deployed app's `/api/webhooks/hunar` correctly verifies
+`X-Hunar-Signature` and updates the matching call row end to end.
+
 ## Project structure
 
 ```
