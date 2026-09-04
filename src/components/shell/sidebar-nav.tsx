@@ -7,7 +7,6 @@ import {
   LayoutDashboard,
   Mic,
   Users,
-  RadioTower,
   Code2,
 } from "lucide-react";
 
@@ -15,7 +14,6 @@ const NAV_ITEMS = [
   { href: "/", label: "Overview", icon: LayoutDashboard, exact: true },
   { href: "/hiring-assistant", label: "AI Hiring Assistant", icon: Mic },
   { href: "/talent-search", label: "Talent Search & Reachout", icon: Users },
-  { href: "/attendance-os", label: "Offline Attendance (Q3)", icon: RadioTower },
 ];
 
 export function SidebarNav() {

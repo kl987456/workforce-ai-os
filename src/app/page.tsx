@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Mic, Users, RadioTower, ArrowRight, Phone, Database, Webhook, Search } from "lucide-react";
+import { Mic, Users, ArrowRight, Phone, Database, Webhook, Search } from "lucide-react";
 
 const FEATURES = [
   {
@@ -20,14 +20,6 @@ const FEATURES = [
     tag: "Live product",
     description:
       "Paste a job description, get a ranked candidate shortlist, and trigger a Hunar voice outreach call per candidate. Conversation responses flow back via webhook onto the same dashboard.",
-  },
-  {
-    href: "/attendance-os",
-    icon: RadioTower,
-    title: "3. Offline Attendance, No Smartphones",
-    tag: "Design proposal",
-    description:
-      "A written proposal: how to track daily attendance for 1,000 workers across 100 locations using only voice + LLMs, no smartphone apps required.",
   },
 ];
 
@@ -65,12 +57,12 @@ export default function OverviewPage() {
           Workforce AI Operating System
         </h1>
         <p className="max-w-2xl text-sm text-muted-foreground">
-          Three deliverables, one app: a voice-AI hiring assistant, a JD-to-reachout talent
-          sourcing tool, and a written design proposal — all wired to real Hunar Voice AI agents.
+          A voice-AI hiring assistant and a JD-to-reachout talent sourcing tool, both wired to
+          real Hunar Voice AI agents in one app.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         {FEATURES.map((f) => (
           <Link key={f.href} href={f.href} className="group">
             <Card className="h-full transition-shadow hover:shadow-md">

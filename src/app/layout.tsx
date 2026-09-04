@@ -18,7 +18,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Workforce AI — Hunar Voice AI Take-Home",
   description:
-    "AI Hiring Assistant, Talent Search & Reachout, and an offline attendance design proposal — all built on Hunar Voice AI agents.",
+    "AI Hiring Assistant and Talent Search & Reachout, both built on Hunar Voice AI agents.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

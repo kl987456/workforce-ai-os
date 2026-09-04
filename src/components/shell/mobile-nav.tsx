@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { Menu, LayoutDashboard, Mic, Users, RadioTower } from "lucide-react";
+import { Menu, LayoutDashboard, Mic, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -18,7 +18,6 @@ const NAV_ITEMS = [
   { href: "/", label: "Overview", icon: LayoutDashboard, exact: true },
   { href: "/hiring-assistant", label: "AI Hiring Assistant", icon: Mic },
   { href: "/talent-search", label: "Talent Search & Reachout", icon: Users },
-  { href: "/attendance-os", label: "Offline Attendance (Q3)", icon: RadioTower },
 ];
 
 export function MobileNav() {

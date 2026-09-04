@@ -1,6 +1,8 @@
 # Workforce AI Operating System
 
-A Hunar.AI take-home assignment: one Next.js app covering all three deliverables.
+A Hunar.AI take-home assignment: one Next.js app covering the two build deliverables.
+(The third deliverable — a written answer to "no smartphones, but LLMs exist" attendance
+tracking — was submitted separately by email, since it's a design question, not an app.)
 
 1. **AI Hiring Assistant** — create a requisition, add candidates, and have a Hunar Voice AI
    agent conduct the first-round phone screen. Extracted answers land on a dashboard once the
@@ -8,9 +10,6 @@ A Hunar.AI take-home assignment: one Next.js app covering all three deliverables
 2. **Talent Search & Reachout** — paste a job description, get a ranked candidate shortlist, and
    trigger a Hunar voice outreach call per candidate. Conversation responses flow back the same
    way.
-3. **Offline Attendance, No Smartphones** — a written design proposal at `/attendance-os` (not a
-   live product) answering: how would you track daily attendance for 1,000 people across 100
-   locations if smartphones didn't exist but LLMs did?
 
 ## Stack
 
@@ -77,7 +76,6 @@ src/
     page.tsx                    # overview
     hiring-assistant/           # feature 1
     talent-search/              # feature 2
-    attendance-os/              # feature 3 (write-up)
     api/
       campaigns/                # requisitions & search campaigns (+ candidates)
       calls/                    # places a Hunar call
