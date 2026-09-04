@@ -19,10 +19,13 @@ import {
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, Users, Search, Target, PhoneCall, PhoneOutgoing } from "lucide-react";
 import { CampaignPicker } from "@/components/workforce/campaign-picker";
-import { CandidateList } from "@/components/workforce/candidate-list";
-import { CallList } from "@/components/workforce/call-list";
+import { CandidateTable } from "@/components/workforce/candidate-table";
+import { CallTable } from "@/components/workforce/call-table";
+import { RoleDistributionChart } from "@/components/workforce/role-distribution-chart";
+import { HiringPipelinePanel } from "@/components/workforce/hiring-pipeline-panel";
 import { useCampaignWorkspace } from "@/components/workforce/use-campaign-workspace";
 import { StatTiles } from "@/components/workforce/stat-tiles";
 import { TERMINAL_STATUSES } from "@/components/workforce/types";
@@ -117,6 +120,7 @@ export default function TalentSearchPage() {
 
   return (
     <div className="mx-auto grid max-w-6xl grid-cols-1 gap-6 lg:grid-cols-[260px_1fr]">
+      <HiringPipelinePanel />
       <div className="flex flex-col gap-3">
         <div className="flex items-center gap-2">
           <Users className="h-4 w-4 text-primary" />
@@ -134,6 +138,9 @@ export default function TalentSearchPage() {
           activeId={activeId}
           onSelect={setActiveId}
           onNew={() => {}}
+          onDeleted={(id) => {
+            if (id === activeId) setActiveId(null);
+          }}
           refreshToken={refreshToken}
         />
       </div>
@@ -216,25 +223,31 @@ export default function TalentSearchPage() {
               ]}
             />
 
-            <div>
-              <h2 className="mb-3 text-sm font-semibold text-foreground">
-                Matched candidates ({candidates.length})
-              </h2>
-              <CandidateList
-                candidates={candidates}
-                campaignId={campaign.id}
-                purpose="TALENT_REACHOUT"
-                onCallCreated={bump}
-                emptyLabel="No matches found for this description — try broadening it."
-              />
-            </div>
+            <RoleDistributionChart candidates={candidates} />
 
-            <div>
-              <h2 className="mb-3 text-sm font-semibold text-foreground">
-                Reachout calls & conversation responses ({calls.length})
-              </h2>
-              <CallList calls={calls} />
-            </div>
+            <Tabs defaultValue="candidates">
+              <TabsList>
+                <TabsTrigger value="candidates">
+                  Matched candidates ({candidates.length})
+                </TabsTrigger>
+                <TabsTrigger value="calls">
+                  Reachout calls & responses ({calls.length})
+                </TabsTrigger>
+              </TabsList>
+              <TabsContent value="candidates" className="mt-4">
+                <CandidateTable
+                  candidates={candidates}
+                  campaignId={campaign.id}
+                  purpose="TALENT_REACHOUT"
+                  onCallCreated={bump}
+                  emptyLabel="No matches found for this description — try broadening it."
+                  draggableToHiring
+                />
+              </TabsContent>
+              <TabsContent value="calls" className="mt-4">
+                <CallTable calls={calls} />
+              </TabsContent>
+            </Tabs>
           </>
         )}
       </div>

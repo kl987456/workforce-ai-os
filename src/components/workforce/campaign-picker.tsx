@@ -1,9 +1,21 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { Plus } from "lucide-react";
+import { Plus, Trash2, Loader2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import type { CampaignDTO } from "./types";
 
 export function CampaignPicker({
@@ -11,16 +23,20 @@ export function CampaignPicker({
   activeId,
   onSelect,
   onNew,
+  onDeleted,
   refreshToken,
 }: {
   kind: "HIRING" | "TALENT_SEARCH";
   activeId: string | null;
   onSelect: (id: string) => void;
   onNew: () => void;
+  onDeleted?: (id: string) => void;
   refreshToken: number;
 }) {
   const [campaigns, setCampaigns] = useState<CampaignDTO[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [localRefresh, setLocalRefresh] = useState(0);
 
   useEffect(() => {
     setLoading(true);
@@ -28,7 +44,27 @@ export function CampaignPicker({
       .then((r) => r.json())
       .then((data) => setCampaigns(data.campaigns ?? []))
       .finally(() => setLoading(false));
-  }, [kind, refreshToken]);
+  }, [kind, refreshToken, localRefresh]);
+
+  async function handleDelete(id: string, title: string) {
+    setDeletingId(id);
+    try {
+      const res = await fetch(`/api/campaigns/${id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        toast.error("Could not delete", { description: data.error ?? "Unknown error" });
+        return;
+      }
+      toast.success(`"${title}" deleted`);
+      setCampaigns((prev) => prev.filter((c) => c.id !== id));
+      onDeleted?.(id);
+    } finally {
+      setDeletingId(null);
+      setLocalRefresh((t) => t + 1);
+    }
+  }
+
+  const label = kind === "HIRING" ? "requisition" : "search";
 
   return (
     <div className="flex flex-col gap-2">
@@ -46,26 +82,66 @@ export function CampaignPicker({
           <div className="px-2 py-1.5 text-xs text-muted-foreground">None yet — create one.</div>
         )}
         {campaigns.map((c) => (
-          <button
+          <div
             key={c.id}
-            onClick={() => onSelect(c.id)}
             className={cn(
-              "rounded-lg px-2.5 py-2 text-left text-sm transition-colors",
-              c.id === activeId
-                ? "bg-primary text-primary-foreground"
-                : "text-foreground hover:bg-accent"
+              "group flex items-center gap-1 rounded-lg pr-1 transition-colors",
+              c.id === activeId ? "bg-primary text-primary-foreground" : "hover:bg-accent"
             )}
           >
-            <div className="truncate font-medium">{c.title}</div>
-            <div
-              className={cn(
-                "truncate text-[11px]",
-                c.id === activeId ? "text-primary-foreground/80" : "text-muted-foreground"
-              )}
+            <button
+              onClick={() => onSelect(c.id)}
+              className="min-w-0 flex-1 rounded-lg px-2.5 py-2 text-left text-sm"
             >
-              {c.department || c.location || new Date(c.createdAt).toLocaleDateString()}
-            </div>
-          </button>
+              <div className="truncate font-medium">{c.title}</div>
+              <div
+                className={cn(
+                  "truncate text-[11px]",
+                  c.id === activeId ? "text-primary-foreground/80" : "text-muted-foreground"
+                )}
+              >
+                {c.department || c.location || new Date(c.createdAt).toLocaleDateString()}
+              </div>
+            </button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <button
+                  aria-label={`Delete ${c.title}`}
+                  onClick={(e) => e.stopPropagation()}
+                  className={cn(
+                    "shrink-0 rounded-md p-1.5 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100",
+                    c.id === activeId
+                      ? "text-primary-foreground/80 hover:bg-primary-foreground/20"
+                      : "text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                  )}
+                >
+                  {deletingId === c.id ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-3.5 w-3.5" />
+                  )}
+                </button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete this {label}?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This permanently deletes &ldquo;{c.title}&rdquo; along with all of its
+                    candidates and call history. This can&apos;t be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    className="bg-destructive text-white hover:bg-destructive/90"
+                    onClick={() => handleDelete(c.id, c.title)}
+                  >
+                    Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
         ))}
       </div>
     </div>

@@ -18,10 +18,11 @@ import {
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, UserPlus, Mic, Users2, PhoneOutgoing, PhoneCall, ThumbsUp } from "lucide-react";
 import { CampaignPicker } from "@/components/workforce/campaign-picker";
-import { CandidateList } from "@/components/workforce/candidate-list";
-import { CallList } from "@/components/workforce/call-list";
+import { CandidateTable } from "@/components/workforce/candidate-table";
+import { CallTable } from "@/components/workforce/call-table";
 import { useCampaignWorkspace } from "@/components/workforce/use-campaign-workspace";
 import { StatTiles } from "@/components/workforce/stat-tiles";
 import { isE164, phoneHint } from "@/lib/phone";
@@ -262,6 +263,9 @@ export default function HiringAssistantPage() {
           activeId={activeId}
           onSelect={setActiveId}
           onNew={() => {}}
+          onDeleted={(id) => {
+            if (id === activeId) setActiveId(null);
+          }}
           refreshToken={refreshToken}
         />
       </div>
@@ -336,25 +340,28 @@ export default function HiringAssistantPage() {
               ]}
             />
 
-            <div>
-              <h2 className="mb-3 text-sm font-semibold text-foreground">
-                Candidate pipeline ({candidates.length})
-              </h2>
-              <CandidateList
-                candidates={candidates}
-                campaignId={campaign.id}
-                purpose="HIRING_SCREEN"
-                onCallCreated={bump}
-                emptyLabel="No candidates yet — add one to trigger a Hunar phone screen."
-              />
-            </div>
-
-            <div>
-              <h2 className="mb-3 text-sm font-semibold text-foreground">
-                Calls & extracted results ({calls.length})
-              </h2>
-              <CallList calls={calls} />
-            </div>
+            <Tabs defaultValue="candidates">
+              <TabsList>
+                <TabsTrigger value="candidates">
+                  Candidate pipeline ({candidates.length})
+                </TabsTrigger>
+                <TabsTrigger value="calls">
+                  Calls & extracted results ({calls.length})
+                </TabsTrigger>
+              </TabsList>
+              <TabsContent value="candidates" className="mt-4">
+                <CandidateTable
+                  candidates={candidates}
+                  campaignId={campaign.id}
+                  purpose="HIRING_SCREEN"
+                  onCallCreated={bump}
+                  emptyLabel="No candidates yet — add one to trigger a Hunar phone screen."
+                />
+              </TabsContent>
+              <TabsContent value="calls" className="mt-4">
+                <CallTable calls={calls} />
+              </TabsContent>
+            </Tabs>
           </>
         )}
       </div>

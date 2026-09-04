@@ -31,3 +31,24 @@ export async function GET(
 
   return NextResponse.json({ campaign, candidates: candidateRows, calls: callRows });
 }
+
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  const db = getDb();
+
+  const campaign = await db.query.campaigns.findFirst({ where: eq(campaigns.id, id) });
+  if (!campaign) {
+    return NextResponse.json({ error: "Campaign not found" }, { status: 404 });
+  }
+
+  // No FK cascade configured, so delete children before the parent: calls
+  // reference both candidates and the campaign, candidates reference the campaign.
+  await db.delete(calls).where(eq(calls.campaignId, id));
+  await db.delete(candidates).where(eq(candidates.campaignId, id));
+  await db.delete(campaigns).where(eq(campaigns.id, id));
+
+  return NextResponse.json({ ok: true });
+}

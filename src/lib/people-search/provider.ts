@@ -23,9 +23,11 @@ export function parseJobDescription(raw: string): ParsedJobQuery {
     /\b(intern|junior|entry[- ]level|mid[- ]level|senior|staff|principal|lead|director|vp|head of)\b/i
   );
 
-  const locationMatch = raw.match(
-    /\b(remote|hybrid|on[- ]site|[A-Z][a-z]+(?:,\s?[A-Z]{2})?)\b/
-  );
+  // Only trust an explicit remote/hybrid/on-site keyword, or a "City, ST"-shaped
+  // pattern — a bare capitalized word (e.g. the first word of a sentence) is not
+  // a reliable location signal and previously produced false positives like
+  // extracting "Auto" from "Auto-created from a Talent Search match...".
+  const locationMatch = raw.match(/\b(remote|hybrid|on[- ]site)\b/i) ?? raw.match(/\b[A-Z][a-zA-Z]+(?:\s[A-Z][a-zA-Z]+)*,\s?[A-Z]{2}\b/);
 
   const yearsMatch = raw.match(/(\d{1,2})\s*\+?\s*(?:years?|yrs?)/i);
 
