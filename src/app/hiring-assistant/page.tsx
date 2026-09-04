@@ -18,11 +18,12 @@ import {
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Loader2, UserPlus, Mic } from "lucide-react";
+import { Loader2, UserPlus, Mic, Users2, PhoneOutgoing, PhoneCall, ThumbsUp } from "lucide-react";
 import { CampaignPicker } from "@/components/workforce/campaign-picker";
 import { CandidateList } from "@/components/workforce/candidate-list";
 import { CallList } from "@/components/workforce/call-list";
 import { useCampaignWorkspace } from "@/components/workforce/use-campaign-workspace";
+import { StatTiles } from "@/components/workforce/stat-tiles";
 import { isE164, phoneHint } from "@/lib/phone";
 import { cn } from "@/lib/utils";
 
@@ -307,6 +308,33 @@ export default function HiringAssistantPage() {
                 </p>
               </CardContent>
             </Card>
+
+            <StatTiles
+              stats={[
+                { label: "Pipeline size", value: String(candidates.length), icon: Users2 },
+                { label: "Screens placed", value: String(calls.length), icon: PhoneOutgoing },
+                {
+                  label: "Screens completed",
+                  value: String(calls.filter((c) => c.status === "COMPLETED").length),
+                  icon: PhoneCall,
+                  tone: "warning",
+                },
+                {
+                  label: "Advance rate",
+                  value: (() => {
+                    const completed = calls.filter(
+                      (c) => c.status === "COMPLETED" && c.result?.recommendation
+                    );
+                    if (completed.length === 0) return "—";
+                    const advancing = completed.filter((c) => c.result?.recommendation === "advance");
+                    return `${Math.round((advancing.length / completed.length) * 100)}%`;
+                  })(),
+                  hint: "of screens with a recommendation",
+                  icon: ThumbsUp,
+                  tone: "success",
+                },
+              ]}
+            />
 
             <div>
               <h2 className="mb-3 text-sm font-semibold text-foreground">

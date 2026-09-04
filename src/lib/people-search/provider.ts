@@ -27,14 +27,27 @@ export function parseJobDescription(raw: string): ParsedJobQuery {
     /\b(remote|hybrid|on[- ]site|[A-Z][a-z]+(?:,\s?[A-Z]{2})?)\b/
   );
 
+  const yearsMatch = raw.match(/(\d{1,2})\s*\+?\s*(?:years?|yrs?)/i);
+
   return {
     raw,
     keywords,
     seniority: seniorityMatch?.[0]?.toLowerCase(),
     location: locationMatch?.[0],
+    minYearsExperience: yearsMatch ? Number(yearsMatch[1]) : undefined,
   };
 }
 
+/**
+ * Scores a candidate against a parsed job description on a 0–1 scale, blending:
+ *  - keyword overlap across title/summary/company/skills (how much of the JD's
+ *    vocabulary shows up on the candidate)
+ *  - skill coverage (how much of the candidate's own skillset the JD actually asked for)
+ *  - seniority-title match
+ *  - years-of-experience fit against any "N+ years" the JD stated
+ * Always returns a value in [0, 1] — callers must not further inflate or floor it,
+ * since an honest low score is more useful than a manufactured "still looks decent" one.
+ */
 function scoreCandidate(
   candidate: Omit<PersonResult, "matchScore">,
   query: ParsedJobQuery
@@ -52,17 +65,28 @@ function scoreCandidate(
   for (const kw of query.keywords) {
     if (haystack.includes(kw)) hits += 1;
   }
-  const skillHits = candidate.skills.filter((s) =>
+  const keywordScore = hits / Math.max(query.keywords.length, 1);
+
+  const matchedSkills = candidate.skills.filter((s) =>
     query.keywords.some((kw) => s.toLowerCase().includes(kw) || kw.includes(s.toLowerCase()))
-  ).length;
+  );
+  const skillScore = matchedSkills.length / Math.max(candidate.skills.length, 1);
 
-  const denom = Math.max(query.keywords.length, 1);
-  const base = (hits / denom) * 0.6 + (skillHits / Math.max(candidate.skills.length, 1)) * 0.4;
+  const seniorityScore =
+    query.seniority && candidate.title.toLowerCase().includes(query.seniority) ? 1 : 0;
 
-  if (query.seniority && candidate.title.toLowerCase().includes(query.seniority)) {
-    return Math.min(1, base + 0.15);
+  let experienceScore = 0.5; // neutral when the JD doesn't state a requirement
+  if (query.minYearsExperience != null) {
+    const gap = candidate.yearsExperience - query.minYearsExperience;
+    // Meets or exceeds the bar: full credit, tapering slightly if wildly overqualified.
+    // Falls short: credit shrinks the further below the bar they are.
+    experienceScore = gap >= 0 ? Math.max(0.7, 1 - gap * 0.02) : Math.max(0, 1 + gap * 0.18);
   }
-  return base;
+
+  const base =
+    keywordScore * 0.4 + skillScore * 0.3 + seniorityScore * 0.1 + experienceScore * 0.2;
+
+  return Math.max(0, Math.min(1, base));
 }
 
 export const seededPeopleSearchProvider: PeopleSearchProvider = {
@@ -78,7 +102,7 @@ export const seededPeopleSearchProvider: PeopleSearchProvider = {
 
     return scored.slice(0, limit).map((c) => ({
       ...c,
-      matchScore: Math.round(Math.max(c.matchScore, 0.35) * 1000) / 10,
+      matchScore: Math.round(c.matchScore * 1000) / 10,
     }));
   },
 };

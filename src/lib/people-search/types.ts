@@ -18,6 +18,7 @@ export interface ParsedJobQuery {
   keywords: string[];
   seniority?: string;
   location?: string;
+  minYearsExperience?: number;
 }
 
 export interface PeopleSearchProvider {

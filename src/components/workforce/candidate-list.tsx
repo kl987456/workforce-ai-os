@@ -2,7 +2,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { TriggerCallDialog } from "./trigger-call-dialog";
 import type { CandidateDTO } from "./types";
-import { MapPin, Building2, Star } from "lucide-react";
+import { MapPin, Building2, Star, BriefcaseBusiness } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+function matchTone(score: number) {
+  if (score >= 75) return "border-transparent bg-success text-success-foreground";
+  if (score >= 50) return "border-transparent bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300";
+  return "border-border bg-muted text-muted-foreground";
+}
 
 export function CandidateList({
   candidates,
@@ -34,8 +41,8 @@ export function CandidateList({
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-medium text-foreground">{c.name}</span>
                 {c.matchScore != null && (
-                  <Badge variant="secondary" className="gap-1 font-mono text-[11px]">
-                    <Star className="h-3 w-3 text-amber-500" />
+                  <Badge className={cn("gap-1 font-mono text-[11px]", matchTone(c.matchScore))}>
+                    <Star className="h-3 w-3" />
                     {c.matchScore.toFixed(1)}% match
                   </Badge>
                 )}
@@ -45,16 +52,22 @@ export function CandidateList({
                   </Badge>
                 )}
               </div>
-              <div className="text-sm text-muted-foreground">
-                {c.roleTitle}
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm text-muted-foreground">
+                <span>{c.roleTitle}</span>
+                {c.yearsExperience != null && (
+                  <span className="inline-flex items-center gap-1">
+                    <BriefcaseBusiness className="h-3 w-3" />
+                    {c.yearsExperience} yrs experience
+                  </span>
+                )}
                 {c.company && (
-                  <span className="inline-flex items-center gap-1 pl-2">
+                  <span className="inline-flex items-center gap-1">
                     <Building2 className="h-3 w-3" />
                     {c.company}
                   </span>
                 )}
                 {c.location && (
-                  <span className="inline-flex items-center gap-1 pl-2">
+                  <span className="inline-flex items-center gap-1">
                     <MapPin className="h-3 w-3" />
                     {c.location}
                   </span>
@@ -65,7 +78,7 @@ export function CandidateList({
               )}
               {c.skills.length > 0 && (
                 <div className="flex flex-wrap gap-1 pt-1">
-                  {c.skills.slice(0, 6).map((s) => (
+                  {c.skills.map((s) => (
                     <Badge key={s} variant="outline" className="text-[10px] font-normal">
                       {s}
                     </Badge>

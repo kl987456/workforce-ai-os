@@ -19,11 +19,13 @@ import {
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Loader2, Users, Search } from "lucide-react";
+import { Loader2, Users, Search, Target, PhoneCall, PhoneOutgoing } from "lucide-react";
 import { CampaignPicker } from "@/components/workforce/campaign-picker";
 import { CandidateList } from "@/components/workforce/candidate-list";
 import { CallList } from "@/components/workforce/call-list";
 import { useCampaignWorkspace } from "@/components/workforce/use-campaign-workspace";
+import { StatTiles } from "@/components/workforce/stat-tiles";
+import { TERMINAL_STATUSES } from "@/components/workforce/types";
 
 function NewSearchDialog({ onCreated }: { onCreated: (id: string) => void }) {
   const [open, setOpen] = useState(false);
@@ -176,6 +178,43 @@ export default function TalentSearchPage() {
                 </p>
               </CardContent>
             </Card>
+
+            <StatTiles
+              stats={[
+                {
+                  label: "Candidates matched",
+                  value: String(candidates.length),
+                  icon: Users,
+                },
+                {
+                  label: "Avg match score",
+                  value:
+                    candidates.length > 0
+                      ? `${(
+                          candidates.reduce((sum, c) => sum + (c.matchScore ?? 0), 0) /
+                          candidates.length
+                        ).toFixed(0)}%`
+                      : "—",
+                  icon: Target,
+                  tone: "success",
+                },
+                {
+                  label: "Reachout calls placed",
+                  value: String(calls.length),
+                  icon: PhoneOutgoing,
+                },
+                {
+                  label: "Calls completed",
+                  value: String(calls.filter((c) => c.status === "COMPLETED").length),
+                  hint:
+                    calls.length > 0
+                      ? `${calls.filter((c) => TERMINAL_STATUSES.has(c.status)).length}/${calls.length} finished`
+                      : undefined,
+                  icon: PhoneCall,
+                  tone: "warning",
+                },
+              ]}
+            />
 
             <div>
               <h2 className="mb-3 text-sm font-semibold text-foreground">
