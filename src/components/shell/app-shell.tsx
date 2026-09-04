@@ -10,7 +10,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <header className="sticky top-0 z-40 flex h-14 items-center justify-between gap-3 border-b border-border bg-background/90 px-4 backdrop-blur-md lg:px-6">
           <MobileNav />
           <div className="hidden text-sm text-muted-foreground lg:block">
-            Take-home assignment · Next.js · TypeScript · Hunar Voice AI
+            Next.js · TypeScript · Hunar Voice AI
           </div>
           <HunarStatusBadge />
         </header>

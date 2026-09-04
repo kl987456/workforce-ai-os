@@ -143,12 +143,12 @@ export default function TalentSearchPage() {
               <CardTitle>Get started</CardTitle>
               <CardDescription>
                 Paste a job description to source a ranked candidate shortlist, then trigger a
-                Hunar Voice AI outreach call per candidate. No PDL / Apollo / Proxycurl /
-                Coresignal key was supplied for this assignment, so search runs against a{" "}
+                Hunar Voice AI outreach call per candidate. Search currently runs against a{" "}
                 <Badge variant="outline" className="align-middle text-[10px]">
                   seeded demo talent pool
                 </Badge>{" "}
-                behind a provider-agnostic adapter — swap in a real API with no UI changes.
+                behind a provider-agnostic adapter — swap in a real people-search API (PDL,
+                Apollo.io, Proxycurl, Coresignal) with no UI changes.
               </CardDescription>
             </CardHeader>
           </Card>

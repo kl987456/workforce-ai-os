@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Workforce AI — Hunar Voice AI Take-Home",
+  title: "Workforce AI — Powered by Hunar Voice AI",
   description:
     "AI Hiring Assistant and Talent Search & Reachout, both built on Hunar Voice AI agents.",
 };

@@ -27,7 +27,7 @@ export function SidebarNav() {
         </div>
         <div className="flex flex-col leading-none">
           <span className="text-sm font-semibold text-sidebar-foreground">Workforce AI</span>
-          <span className="text-[11px] text-muted-foreground">Hunar Voice Assignment</span>
+          <span className="text-[11px] text-muted-foreground">Hunar Voice AI</span>
         </div>
       </div>
 

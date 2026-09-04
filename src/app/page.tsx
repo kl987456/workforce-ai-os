@@ -51,7 +51,7 @@ export default function OverviewPage() {
     <div className="mx-auto flex max-w-6xl flex-col gap-8">
       <div className="flex flex-col gap-2">
         <Badge variant="outline" className="w-fit text-xs font-mono text-muted-foreground">
-          Hunar.AI Take-Home Assignment
+          Powered by Hunar Voice AI
         </Badge>
         <h1 className="text-3xl font-semibold tracking-tight text-foreground">
           Workforce AI Operating System
