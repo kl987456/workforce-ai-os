@@ -27,7 +27,12 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const db = getDb();
-  const json = await req.json();
+  let json: unknown;
+  try {
+    json = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
   const parsed = createCampaignSchema.safeParse(json);
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 });
@@ -52,7 +57,7 @@ export async function POST(req: NextRequest) {
 
   if (kind === "TALENT_SEARCH") {
     const provider = getPeopleSearchProvider();
-    const results = await provider.search(parsedQuery, 12);
+    const results = await provider.search(parsedQuery, 50);
 
     if (results.length > 0) {
       seededCandidates = await db

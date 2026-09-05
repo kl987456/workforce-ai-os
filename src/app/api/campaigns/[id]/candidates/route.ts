@@ -5,6 +5,8 @@ import { getDb } from "@/db";
 import { campaigns, candidates } from "@/db/schema";
 import { E164_REGEX } from "@/lib/phone";
 
+const idSchema = z.string().uuid();
+
 const addCandidateSchema = z.object({
   name: z.string().min(2),
   phone: z
@@ -21,6 +23,9 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+  if (!idSchema.safeParse(id).success) {
+    return NextResponse.json({ error: "Invalid campaign id" }, { status: 400 });
+  }
   const db = getDb();
 
   const campaign = await db.query.campaigns.findFirst({ where: eq(campaigns.id, id) });
@@ -28,7 +33,12 @@ export async function POST(
     return NextResponse.json({ error: "Campaign not found" }, { status: 404 });
   }
 
-  const json = await req.json();
+  let json: unknown;
+  try {
+    json = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
   const parsed = addCandidateSchema.safeParse(json);
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 });

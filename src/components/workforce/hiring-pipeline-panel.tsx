@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { Mic, ChevronDown, ChevronUp, Plus, Loader2 } from "lucide-react";
 import type { CampaignDTO, CandidateDTO } from "./types";
@@ -41,9 +42,12 @@ export function HiringPipelinePanel() {
     setLoading(true);
     try {
       const res = await fetch("/api/campaigns?kind=HIRING");
+      if (!res.ok) throw new Error(`Request failed: ${res.status}`);
       const data = await res.json();
       const list: CampaignDTO[] = data.campaigns ?? [];
       setCampaigns(list);
+    } catch {
+      toast.error("Could not load requisitions for the pipeline panel");
     } finally {
       setLoading(false);
     }
@@ -116,6 +120,8 @@ export function HiringPipelinePanel() {
     <div className="fixed bottom-4 right-4 z-30 w-72 rounded-xl border border-border bg-card shadow-lg">
       <button
         onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        aria-controls="hiring-pipeline-panel-content"
         className="flex w-full items-center justify-between gap-2 rounded-t-xl px-3 py-2.5"
       >
         <span className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
@@ -129,12 +135,18 @@ export function HiringPipelinePanel() {
       </button>
 
       {open && (
-        <div className="flex flex-col gap-1.5 border-t border-border p-2.5">
+        <div id="hiring-pipeline-panel-content" className="flex flex-col gap-1.5 border-t border-border p-2.5">
           <p className="px-0.5 pb-1 text-[11px] text-muted-foreground">
             Drag a candidate row here to add them to a requisition.
           </p>
 
-          {loading && <div className="px-1 py-2 text-xs text-muted-foreground">Loading…</div>}
+          {loading && (
+            <div className="flex flex-col gap-1.5">
+              {Array.from({ length: 2 }).map((_, i) => (
+                <Skeleton key={i} className="h-[38px] w-full rounded-lg" />
+              ))}
+            </div>
+          )}
 
           {!loading &&
             campaigns.map((c) => (
@@ -151,7 +163,7 @@ export function HiringPipelinePanel() {
                   if (candidate) transferCandidate(candidate, c.id);
                 }}
                 className={cn(
-                  "flex items-center justify-between gap-2 rounded-lg border px-2.5 py-2 text-sm transition-colors",
+                  "flex items-center justify-between gap-2 rounded-lg border px-2.5 py-2 text-sm transition-all duration-150",
                   dragOverId === c.id
                     ? "border-primary bg-accent"
                     : "border-border bg-background"
@@ -181,7 +193,7 @@ export function HiringPipelinePanel() {
               if (candidate) transferToNewRole(candidate);
             }}
             className={cn(
-              "flex items-center justify-center gap-1.5 rounded-lg border border-dashed px-2.5 py-2 text-xs transition-colors",
+              "flex items-center justify-center gap-1.5 rounded-lg border border-dashed px-2.5 py-2 text-xs transition-all duration-150",
               dragOverId === "__new__"
                 ? "border-primary bg-accent text-primary"
                 : "border-border text-muted-foreground"

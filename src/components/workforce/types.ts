@@ -20,8 +20,17 @@ export interface CandidateDTO {
   yearsExperience: number | null;
   skills: string[];
   matchScore: number | null;
-  source: "MANUAL" | "SEEDED_SEARCH";
-  profile: { summary?: string; linkedinUrl?: string; provider?: string } | null;
+  source: "MANUAL" | "SEEDED_SEARCH" | "REACHOUT_SYNC";
+  profile: {
+    summary?: string;
+    linkedinUrl?: string;
+    provider?: string;
+    reachoutResult?: Record<string, unknown>;
+  } | null;
+  sourceCallId: string | null;
+  sourceCandidateId: string | null;
+  isFavorite: boolean;
+  notes: string | null;
   createdAt: string;
 }
 
@@ -48,6 +57,7 @@ export interface CallDTO {
   durationSeconds: number | null;
   recordingUrl: string | null;
   result: Record<string, unknown> | null;
+  errorMessage: string | null;
   createdAt: string;
   startedAt: string | null;
   endedAt: string | null;
@@ -61,3 +71,32 @@ export const TERMINAL_STATUSES = new Set([
   "FAILED",
   "CANCELLED",
 ]);
+
+/**
+ * One entry in a candidate's unified timeline (GET /api/candidates/[id]/timeline).
+ * A 'sourced' event marks a candidate row coming into existence (added manually,
+ * matched by a Talent Search, or synced into the Hiring pipeline from a reachout
+ * call) — `candidate` is a full CandidateDTO so the header info is available
+ * without a second lookup. A 'call' event carries a full CallDTO (with `candidate`
+ * populated) so it can be dropped straight into CallDetailSheet if ever needed.
+ */
+export interface TimelineSourcedEvent {
+  type: "sourced";
+  at: string;
+  label: string;
+  candidate: CandidateDTO;
+}
+
+export interface TimelineCallEvent {
+  type: "call";
+  at: string;
+  purpose: "HIRING_SCREEN" | "TALENT_REACHOUT" | null;
+  call: CallDTO;
+}
+
+export type TimelineEvent = TimelineSourcedEvent | TimelineCallEvent;
+
+export interface CandidateTimelineResponse {
+  candidate: CandidateDTO;
+  timeline: TimelineEvent[];
+}

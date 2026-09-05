@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,18 +21,87 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Users, Search, Target, PhoneCall, PhoneOutgoing } from "lucide-react";
+import { Loader2, Users, Search, Target, PhoneCall, PhoneOutgoing, Download } from "lucide-react";
 import { CampaignPicker } from "@/components/workforce/campaign-picker";
 import { CandidateTable } from "@/components/workforce/candidate-table";
+import { CustomizeAgentDialog } from "@/components/workforce/customize-agent-dialog";
+import { BulkReachoutDialog } from "@/components/workforce/bulk-reachout-dialog";
 import { CallTable } from "@/components/workforce/call-table";
 import { RoleDistributionChart } from "@/components/workforce/role-distribution-chart";
 import { HiringPipelinePanel } from "@/components/workforce/hiring-pipeline-panel";
+import { TableSkeleton } from "@/components/workforce/table-skeleton";
 import { useCampaignWorkspace } from "@/components/workforce/use-campaign-workspace";
 import { StatTiles } from "@/components/workforce/stat-tiles";
 import { TERMINAL_STATUSES } from "@/components/workforce/types";
+import type { CallDTO, CampaignDTO, CandidateDTO } from "@/components/workforce/types";
+import { toCsv, downloadCsv } from "@/lib/csv";
 
-function NewSearchDialog({ onCreated }: { onCreated: (id: string) => void }) {
-  const [open, setOpen] = useState(false);
+// Turns a campaign title into a filesystem-safe slug for export filenames:
+// lowercase, whitespace runs to single hyphens, then strip anything left
+// that isn't a lowercase letter, digit, or hyphen.
+function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-]/g, "");
+}
+
+function formatDateYMD(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+// Summarizes a call's status plus any extracted result fields into one
+// human-readable string for a CSV cell, e.g. "COMPLETED — interest level: high".
+function formatCallSummary(call: CallDTO | undefined): string {
+  if (!call) return "";
+  const parts: string[] = [call.status];
+  if (call.result) {
+    const resultText = Object.entries(call.result)
+      .map(([key, value]) => `${key.replace(/_/g, " ")}: ${String(value)}`)
+      .join(", ");
+    if (resultText) parts.push(resultText);
+  }
+  return parts.join(" — ");
+}
+
+function exportCandidatesCsv(campaign: CampaignDTO, candidates: CandidateDTO[], calls: CallDTO[]) {
+  if (candidates.length === 0) {
+    toast.error("No candidates to export");
+    return;
+  }
+  const rows = candidates.map((c) => {
+    const latestCall = calls
+      .filter((call) => call.candidateId === c.id)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+    return {
+      name: c.name,
+      role: c.roleTitle ?? "",
+      company: c.company ?? "",
+      location: c.location ?? "",
+      "years experience": c.yearsExperience ?? "",
+      skills: c.skills.join("; "),
+      "match score": c.matchScore ?? "",
+      isFavorite: c.isFavorite,
+      notes: c.notes ?? "",
+      "latest reachout summary": formatCallSummary(latestCall),
+    };
+  });
+  downloadCsv(`${slugify(campaign.title)}-candidates-${formatDateYMD(new Date())}.csv`, toCsv(rows));
+}
+
+function NewSearchDialog({
+  open,
+  onOpenChange,
+  onCreated,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onCreated: (id: string) => void;
+}) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [loading, setLoading] = useState(false);
@@ -54,9 +124,7 @@ function NewSearchDialog({ onCreated }: { onCreated: (id: string) => void }) {
         return;
       }
       toast.success(`Found ${data.candidates.length} matching candidates`);
-      setOpen(false);
-      setTitle("");
-      setDescription("");
+      onOpenChange(false);
       onCreated(data.campaign.id);
     } finally {
       setLoading(false);
@@ -64,7 +132,16 @@ function NewSearchDialog({ onCreated }: { onCreated: (id: string) => void }) {
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        onOpenChange(v);
+        if (!v) {
+          setTitle("");
+          setDescription("");
+        }
+      }}
+    >
       <DialogTrigger asChild>
         <Button size="sm" className="w-full gap-1.5">
           <Search className="h-3.5 w-3.5" /> New search
@@ -95,7 +172,7 @@ function NewSearchDialog({ onCreated }: { onCreated: (id: string) => void }) {
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)} disabled={loading}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
             Cancel
           </Button>
           <Button onClick={handleCreate} disabled={loading}>
@@ -108,10 +185,35 @@ function NewSearchDialog({ onCreated }: { onCreated: (id: string) => void }) {
   );
 }
 
-export default function TalentSearchPage() {
-  const [activeId, setActiveId] = useState<string | null>(null);
+function TalentSearchPageInner() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const campaignParam = searchParams.get("campaign");
+  const [activeId, setActiveIdState] = useState<string | null>(campaignParam);
   const [refreshToken, setRefreshToken] = useState(0);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [newSearchOpen, setNewSearchOpen] = useState(false);
+  // Lifted to this always-mounted parent so it survives the Tabs subtree
+  // unmounting/remounting whenever the workspace re-enters its loading state.
+  const [tab, setTab] = useState("candidates");
   const { campaign, candidates, calls, loading, refresh } = useCampaignWorkspace(activeId);
+
+  // Keep in sync when the ?campaign= query param changes without a remount —
+  // e.g. selecting a different campaign from the command palette while already here.
+  useEffect(() => {
+    setActiveIdState((current) => (campaignParam !== current ? campaignParam : current));
+  }, [campaignParam]);
+
+  // Selection is scoped to the active campaign's candidate list — clear it whenever
+  // that list changes so stale ids from a previous campaign never linger.
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [activeId]);
+
+  function setActiveId(id: string | null) {
+    setActiveIdState(id);
+    router.replace(id ? `/talent-search?campaign=${id}` : "/talent-search", { scroll: false });
+  }
 
   function bump() {
     setRefreshToken((t) => t + 1);
@@ -127,6 +229,8 @@ export default function TalentSearchPage() {
           <h1 className="text-sm font-semibold">Talent Search & Reachout</h1>
         </div>
         <NewSearchDialog
+          open={newSearchOpen}
+          onOpenChange={setNewSearchOpen}
           onCreated={(id) => {
             bump();
             setActiveId(id);
@@ -137,7 +241,7 @@ export default function TalentSearchPage() {
           kind="TALENT_SEARCH"
           activeId={activeId}
           onSelect={setActiveId}
-          onNew={() => {}}
+          onNew={() => setNewSearchOpen(true)}
           onDeleted={(id) => {
             if (id === activeId) setActiveId(null);
           }}
@@ -167,6 +271,7 @@ export default function TalentSearchPage() {
           <div className="flex flex-col gap-3">
             <Skeleton className="h-24 w-full" />
             <Skeleton className="h-32 w-full" />
+            <TableSkeleton columns={7} />
           </div>
         )}
 
@@ -174,10 +279,15 @@ export default function TalentSearchPage() {
           <>
             <Card>
               <CardHeader>
-                <CardTitle>{campaign.title}</CardTitle>
-                <CardDescription>
-                  {candidates.length} candidates matched · seeded demo data source
-                </CardDescription>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <CardTitle>{campaign.title}</CardTitle>
+                    <CardDescription>
+                      {candidates.length} candidates matched · seeded demo data source
+                    </CardDescription>
+                  </div>
+                  <CustomizeAgentDialog campaignId={campaign.id} purpose="TALENT_REACHOUT" />
+                </div>
               </CardHeader>
               <CardContent>
                 <p className="whitespace-pre-wrap text-sm text-muted-foreground line-clamp-4">
@@ -223,9 +333,20 @@ export default function TalentSearchPage() {
               ]}
             />
 
+            <div className="flex justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                onClick={() => exportCandidatesCsv(campaign, candidates, calls)}
+              >
+                <Download className="h-3.5 w-3.5" /> Export CSV
+              </Button>
+            </div>
+
             <RoleDistributionChart candidates={candidates} />
 
-            <Tabs defaultValue="candidates">
+            <Tabs value={tab} onValueChange={setTab}>
               <TabsList>
                 <TabsTrigger value="candidates">
                   Matched candidates ({candidates.length})
@@ -234,7 +355,17 @@ export default function TalentSearchPage() {
                   Reachout calls & responses ({calls.length})
                 </TabsTrigger>
               </TabsList>
-              <TabsContent value="candidates" className="mt-4">
+              <TabsContent value="candidates" className="mt-4 flex flex-col gap-3">
+                <div className="flex items-center justify-end">
+                  <BulkReachoutDialog
+                    campaignId={campaign.id}
+                    candidateIds={Array.from(selectedIds)}
+                    onPlaced={() => {
+                      setSelectedIds(new Set());
+                      bump();
+                    }}
+                  />
+                </div>
                 <CandidateTable
                   candidates={candidates}
                   campaignId={campaign.id}
@@ -242,6 +373,9 @@ export default function TalentSearchPage() {
                   onCallCreated={bump}
                   emptyLabel="No matches found for this description — try broadening it."
                   draggableToHiring
+                  enableBulkSelect
+                  selectedIds={selectedIds}
+                  onSelectedIdsChange={setSelectedIds}
                 />
               </TabsContent>
               <TabsContent value="calls" className="mt-4">
@@ -252,5 +386,13 @@ export default function TalentSearchPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function TalentSearchPage() {
+  return (
+    <Suspense fallback={null}>
+      <TalentSearchPageInner />
+    </Suspense>
   );
 }

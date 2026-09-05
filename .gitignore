@@ -46,6 +46,12 @@ next-env.d.ts
 
 # Original Stitch design export (reference only, not part of the app)
 /stitch_export/
+/stitch_export_v2/
 
 # Local tooling config
 /.claude/
+
+# Separate custom-design app — its own independent git repo, not part of this one
+/custom-app/
+
+.vercel

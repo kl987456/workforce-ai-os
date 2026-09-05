@@ -97,7 +97,12 @@ export const hunar = {
         callee_name: string;
         mobile_number: string;
         custom_data?: Record<string, unknown>;
+        /** Per-row correlation id (we pass our local calls.id) so webhook deliveries for
+         *  each call in the batch can still be matched back to the right row even when
+         *  the bulk response itself doesn't echo back individual Hunar call ids. */
+        request_id?: string;
       }>;
+      /** Batch-level request id, distinct from the per-row one above. */
       request_id?: string;
       from_phone_number?: string;
       retry_config?: CreateCallPayload["retry_config"];

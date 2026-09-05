@@ -1,13 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { eq, desc } from "drizzle-orm";
 import { getDb } from "@/db";
 import { campaigns, candidates, calls } from "@/db/schema";
+
+const idSchema = z.string().uuid();
 
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+  if (!idSchema.safeParse(id).success) {
+    return NextResponse.json({ error: "Invalid campaign id" }, { status: 400 });
+  }
   const db = getDb();
 
   const campaign = await db.query.campaigns.findFirst({
@@ -37,6 +43,9 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+  if (!idSchema.safeParse(id).success) {
+    return NextResponse.json({ error: "Invalid campaign id" }, { status: 400 });
+  }
   const db = getDb();
 
   const campaign = await db.query.campaigns.findFirst({ where: eq(campaigns.id, id) });

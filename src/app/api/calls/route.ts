@@ -1,11 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and, notInArray } from "drizzle-orm";
 import { getDb } from "@/db";
-import { calls, candidates, campaigns } from "@/db/schema";
+import { agents, calls, candidates, campaigns } from "@/db/schema";
 import { getOrCreateDefaultAgent } from "@/lib/hunar/ensure-agent";
 import { hunar, HunarApiError } from "@/lib/hunar/client";
 import { E164_REGEX } from "@/lib/phone";
+import { getWebhookCallbackUrl, InvalidCallbackUrlError } from "@/lib/hunar/callback-url";
+
+const TERMINAL_CALL_STATUSES: (typeof calls.$inferSelect)["status"][] = [
+  "COMPLETED",
+  "NOT_CONNECTED",
+  "FAILED",
+  "CANCELLED",
+];
 
 const createCallSchema = z.object({
   candidateId: z.string().uuid(),
@@ -16,15 +24,12 @@ const createCallSchema = z.object({
   phoneOverride: z.string().min(6).optional(),
 });
 
-function appBaseUrl() {
-  const base = process.env.APP_BASE_URL;
-  if (!base) throw new Error("APP_BASE_URL is not set");
-  return base.replace(/\/$/, "");
-}
-
 export async function GET(req: NextRequest) {
   const db = getDb();
   const campaignId = req.nextUrl.searchParams.get("campaignId");
+  if (campaignId && !z.string().uuid().safeParse(campaignId).success) {
+    return NextResponse.json({ error: "Invalid campaignId" }, { status: 400 });
+  }
 
   const rows = await db.query.calls.findMany({
     where: campaignId ? eq(calls.campaignId, campaignId) : undefined,
@@ -37,7 +42,12 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const db = getDb();
-  const json = await req.json();
+  let json: unknown;
+  try {
+    json = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
   const parsed = createCallSchema.safeParse(json);
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 422 });
@@ -51,11 +61,48 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Candidate not found" }, { status: 404 });
   }
 
-  const campaign = campaignId
-    ? await db.query.campaigns.findFirst({ where: eq(campaigns.id, campaignId) })
-    : null;
+  // Guard against placing two real, simultaneous outbound calls to the same candidate
+  // (double-click, duplicate tab, client retry) — reject instead of racing to insert.
+  const activeCall = await db.query.calls.findFirst({
+    where: and(
+      eq(calls.candidateId, candidate.id),
+      notInArray(calls.status, TERMINAL_CALL_STATUSES)
+    ),
+  });
+  if (activeCall) {
+    return NextResponse.json(
+      { error: "This candidate already has a call in progress. Wait for it to finish before placing another." },
+      { status: 409 }
+    );
+  }
 
-  const agent = await getOrCreateDefaultAgent(purpose);
+  let campaign = null;
+  if (campaignId) {
+    campaign = await db.query.campaigns.findFirst({ where: eq(campaigns.id, campaignId) });
+    if (!campaign) {
+      return NextResponse.json({ error: "Campaign not found" }, { status: 404 });
+    }
+    if (candidate.campaignId !== campaignId) {
+      return NextResponse.json(
+        { error: "Candidate does not belong to this campaign" },
+        { status: 400 }
+      );
+    }
+  }
+
+  let agent: Awaited<ReturnType<typeof getOrCreateDefaultAgent>>;
+  try {
+    // A campaign with a customized agent (screening questions + voice persona) uses
+    // that specific agent instead of the shared default for its purpose. Fall back
+    // to the default when the campaign never customized one (or has no campaign).
+    const customAgent = campaign?.agentId
+      ? await db.query.agents.findFirst({ where: eq(agents.id, campaign.agentId) })
+      : null;
+    agent = customAgent ?? (await getOrCreateDefaultAgent(purpose));
+  } catch (err) {
+    const message = err instanceof HunarApiError ? err.message : "Failed to set up the Hunar voice agent";
+    return NextResponse.json({ error: message }, { status: 502 });
+  }
 
   const phone = phoneOverride ?? candidate.phone;
   if (!E164_REGEX.test(phone)) {
@@ -63,6 +110,16 @@ export async function POST(req: NextRequest) {
       { error: "Phone number must be in E.164 format: + followed by country code and number, e.g. +917411771293" },
       { status: 422 }
     );
+  }
+
+  let webhookUrl: string;
+  try {
+    webhookUrl = getWebhookCallbackUrl();
+  } catch (err) {
+    if (err instanceof InvalidCallbackUrlError) {
+      return NextResponse.json({ error: err.message }, { status: 422 });
+    }
+    throw err;
   }
 
   const [callRow] = await db
@@ -74,9 +131,6 @@ export async function POST(req: NextRequest) {
       status: "NOT_STARTED",
     })
     .returning();
-
-  const base = appBaseUrl();
-  const webhookUrl = `${base}/api/webhooks/hunar`;
 
   try {
     const hunarCall = await hunar.calls.create({
@@ -110,6 +164,9 @@ export async function POST(req: NextRequest) {
       .update(calls)
       .set({
         hunarCallId: hunarCall.id,
+        // Mirrors what's actually sent to Hunar as request_id (our own call row id) —
+        // was previously left NULL forever despite the column existing.
+        requestId: callRow.id,
         status: (hunarCall.status as typeof calls.$inferSelect.status) ?? "INITIATED",
         lifecycleStatus: hunarCall.lifecycle_status,
         updatedAt: new Date(),
@@ -122,7 +179,7 @@ export async function POST(req: NextRequest) {
     const message = err instanceof HunarApiError ? err.message : "Failed to place call via Hunar";
     await db
       .update(calls)
-      .set({ status: "FAILED", updatedAt: new Date() })
+      .set({ status: "FAILED", errorMessage: message, updatedAt: new Date() })
       .where(eq(calls.id, callRow.id));
 
     return NextResponse.json({ error: message }, { status: 502 });

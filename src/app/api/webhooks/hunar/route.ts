@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { calls, webhookEvents } from "@/db/schema";
 import { verifyHunarWebhookSignature } from "@/lib/hunar/webhook";
+import { syncReachoutResultToHiringPipeline } from "@/lib/hunar/sync-to-hiring";
 import type { HunarWebhookPayload } from "@/lib/hunar/types";
 
 export async function POST(req: NextRequest) {
@@ -20,12 +22,21 @@ export async function POST(req: NextRequest) {
       })
     : false;
 
-  let payload: HunarWebhookPayload;
+  let parsedBody: unknown;
   try {
-    payload = JSON.parse(rawBody);
+    parsedBody = JSON.parse(rawBody);
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
+
+  // webhook_events.event_type is NOT NULL — validate shape before ever touching the
+  // DB, so a malformed delivery (e.g. a provider "test webhook" ping) gets a clean
+  // 400 instead of crashing the insert with an unhandled constraint violation.
+  const shapeCheck = z.object({ event_type: z.string().min(1) }).safeParse(parsedBody);
+  if (!shapeCheck.success) {
+    return NextResponse.json({ error: "Malformed webhook payload: event_type is required" }, { status: 400 });
+  }
+  const payload = parsedBody as HunarWebhookPayload;
 
   const db = getDb();
 
@@ -60,7 +71,24 @@ export async function POST(req: NextRequest) {
   const matchValue = payload.request_id ?? payload.call_id;
 
   if (matchValue) {
-    await db.update(calls).set(updates).where(eq(matchColumn, matchValue));
+    const [updated] = await db
+      .update(calls)
+      .set(updates)
+      .where(eq(matchColumn, matchValue))
+      .returning({ id: calls.id });
+
+    if (!updated) {
+      console.warn(
+        `Hunar webhook (${payload.event_type}) matched no call row — request_id=${payload.request_id ?? "none"} call_id=${payload.call_id}`
+      );
+    } else if (payload.result) {
+      // A Talent Search reachout call just delivered its extracted result — sync
+      // the candidate + result into the Hiring pipeline (see sync-to-hiring.ts).
+      // Best-effort: a sync failure shouldn't fail the webhook and trigger Hunar retries.
+      await syncReachoutResultToHiringPipeline(updated.id).catch((err) => {
+        console.error("Failed to sync reachout result to hiring pipeline", err);
+      });
+    }
   }
 
   return NextResponse.json({ ok: true });

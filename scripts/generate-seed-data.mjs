@@ -150,7 +150,27 @@ function domainFromTitle(title) {
   return title.replace(/\s*\(.*\)/, "").toLowerCase();
 }
 
+// India is heavily represented in the real applicant pool this data stands in
+// for, so it gets a fixed, guaranteed share rather than falling out of a
+// uniform draw over all cities (which would only average ~1/8th of records).
+const INDIA_CITIES = CITIES.filter(([, country]) => country === "India");
+const OTHER_CITIES = CITIES.filter(([, country]) => country !== "India");
+const TARGET_INDIA_COUNT = 500;
+
+const TOTAL_RECORDS = ROLE_ARCHETYPES.reduce((sum, a) => sum + a.count, 0);
+const isIndiaBySlot = Array.from(
+  { length: TOTAL_RECORDS },
+  (_, i) => i < TARGET_INDIA_COUNT
+);
+// Fisher-Yates shuffle (seeded) so the India slots land randomly across
+// archetypes/seniority instead of clumping in whichever roles are generated first.
+for (let i = isIndiaBySlot.length - 1; i > 0; i--) {
+  const j = Math.floor(rand() * (i + 1));
+  [isIndiaBySlot[i], isIndiaBySlot[j]] = [isIndiaBySlot[j], isIndiaBySlot[i]];
+}
+
 let seq = 1;
+let slot = 0;
 const records = [];
 
 for (const archetype of ROLE_ARCHETYPES) {
@@ -158,7 +178,7 @@ for (const archetype of ROLE_ARCHETYPES) {
     const first = pick(FIRST_NAMES);
     const last = pick(LAST_NAMES);
     const name = `${first} ${last}`;
-    const [city, country] = pick(CITIES);
+    const [city, country] = pick(isIndiaBySlot[slot++] ? INDIA_CITIES : OTHER_CITIES);
     const years = int(2, 15);
     const skills = pickN(archetype.skills, Math.min(archetype.skills.length, int(4, 6)));
     const company = `${pick(COMPANY_PREFIX)} ${pick(COMPANY_SUFFIX)}`;

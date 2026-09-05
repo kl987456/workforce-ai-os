@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 
 type Status = "checking" | "connected" | "unreachable";
 
-export function HunarStatusBadge() {
+export function HunarStatusBadge({ className }: { className?: string }) {
   const [status, setStatus] = useState<Status>("checking");
 
   useEffect(() => {
@@ -29,7 +29,8 @@ export function HunarStatusBadge() {
         "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium",
         status === "connected" && "border-success-foreground/20 bg-success text-success-foreground",
         status === "unreachable" && "border-destructive/20 bg-destructive/10 text-destructive",
-        status === "checking" && "border-border bg-muted text-muted-foreground"
+        status === "checking" && "border-border bg-muted text-muted-foreground",
+        className
       )}
     >
       <span

@@ -50,11 +50,15 @@ export function CallTable({ calls }: { calls: CallDTO[] }) {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {calls.map((call) => {
+          {calls.map((call, index) => {
             const signal = keySignal(call.result);
             const noConnect = call.status === "NOT_CONNECTED" || call.status === "FAILED";
             return (
-              <TableRow key={call.id}>
+              <TableRow
+                key={call.id}
+                className="animate-row-in"
+                style={{ animationDelay: `${(index % 8) * 40}ms` }}
+              >
                 <TableCell className="font-medium text-foreground">
                   {call.candidate?.name ?? "Candidate"}
                 </TableCell>

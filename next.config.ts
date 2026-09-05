@@ -3,7 +3,7 @@ import path from "node:path";
 
 const nextConfig: NextConfig = {
   /* config options here */
-  reactCompiler: true,
+  reactCompiler: false,
   turbopack: {
     root: path.resolve(__dirname),
   },

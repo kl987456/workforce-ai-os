@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { Plus, Trash2, Loader2 } from "lucide-react";
 import {
@@ -35,14 +36,23 @@ export function CampaignPicker({
 }) {
   const [campaigns, setCampaigns] = useState<CampaignDTO[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [localRefresh, setLocalRefresh] = useState(0);
 
   useEffect(() => {
     setLoading(true);
+    setLoadError(false);
     fetch(`/api/campaigns?kind=${kind}`)
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error(`Request failed: ${r.status}`);
+        return r.json();
+      })
       .then((data) => setCampaigns(data.campaigns ?? []))
+      .catch(() => {
+        setLoadError(true);
+        toast.error(kind === "HIRING" ? "Could not load requisitions" : "Could not load searches");
+      })
       .finally(() => setLoading(false));
   }, [kind, refreshToken, localRefresh]);
 
@@ -77,20 +87,32 @@ export function CampaignPicker({
         </Button>
       </div>
       <div className="flex flex-col gap-1 max-h-[50vh] overflow-y-auto pr-1">
-        {loading && <div className="px-2 py-1.5 text-xs text-muted-foreground">Loading…</div>}
+        {loading && campaigns.length === 0 && (
+          <div className="flex flex-col gap-1">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="flex flex-col gap-1.5 rounded-lg px-2.5 py-2">
+                <Skeleton className="h-3.5 w-3/5" />
+                <Skeleton className="h-3 w-2/5" />
+              </div>
+            ))}
+          </div>
+        )}
         {!loading && campaigns.length === 0 && (
-          <div className="px-2 py-1.5 text-xs text-muted-foreground">None yet — create one.</div>
+          <div className="px-2 py-1.5 text-xs text-muted-foreground">
+            {loadError ? "Couldn't load — try again." : "None yet — create one."}
+          </div>
         )}
         {campaigns.map((c) => (
           <div
             key={c.id}
             className={cn(
-              "group flex items-center gap-1 rounded-lg pr-1 transition-colors",
+              "group flex items-center gap-1 rounded-lg pr-1 transition-colors duration-200",
               c.id === activeId ? "bg-primary text-primary-foreground" : "hover:bg-accent"
             )}
           >
             <button
               onClick={() => onSelect(c.id)}
+              aria-current={c.id === activeId ? "true" : undefined}
               className="min-w-0 flex-1 rounded-lg px-2.5 py-2 text-left text-sm"
             >
               <div className="truncate font-medium">{c.title}</div>

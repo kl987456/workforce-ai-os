@@ -29,8 +29,13 @@ export function RoleDistributionChart({ candidates }: { candidates: CandidateDTO
         <CardDescription>Top role archetypes among the matched candidates</CardDescription>
       </CardHeader>
       <CardContent>
-        <ChartContainer config={chartConfig} className="aspect-auto h-[220px] w-full">
-          <BarChart data={data} layout="vertical" margin={{ left: 8 }}>
+        <ChartContainer
+          config={chartConfig}
+          role="img"
+          aria-label={`Bar chart of role distribution: ${data.map((d) => `${d.role}, ${d.count}`).join("; ")}`}
+          className="aspect-auto h-[220px] w-full"
+        >
+          <BarChart accessibilityLayer data={data} layout="vertical" margin={{ left: 8 }}>
             <CartesianGrid horizontal={false} />
             <XAxis type="number" allowDecimals={false} tickLine={false} axisLine={false} />
             <YAxis
@@ -45,6 +50,13 @@ export function RoleDistributionChart({ candidates }: { candidates: CandidateDTO
             <Bar dataKey="count" fill="var(--color-count)" radius={4} />
           </BarChart>
         </ChartContainer>
+        <ul className="sr-only">
+          {data.map((d) => (
+            <li key={d.role}>
+              {d.role}: {d.count} candidate{d.count === 1 ? "" : "s"}
+            </li>
+          ))}
+        </ul>
       </CardContent>
     </Card>
   );

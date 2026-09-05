@@ -140,3 +140,78 @@
     @apply font-sans;
   }
 }
+
+@layer utilities {
+  /* Subtle pulsing ring for "live" call statuses (RINGING / IN_PROGRESS). */
+  @keyframes status-pulse-ring {
+    0%,
+    100% {
+      box-shadow: 0 0 0 0 color-mix(in oklch, var(--chart-4), transparent 55%);
+    }
+    50% {
+      box-shadow: 0 0 0 4px color-mix(in oklch, var(--chart-4), transparent 85%);
+    }
+  }
+  .animate-status-pulse-ring {
+    animation: status-pulse-ring 1.8s ease-in-out infinite;
+  }
+
+  /* Fade + slide-up entrance for table rows, staggered via animation-delay. */
+  @keyframes row-fade-in {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  .animate-row-in {
+    animation: row-fade-in 0.35s ease-out both;
+  }
+
+  /* Left-to-right shimmer sweep for skeleton loaders. */
+  @keyframes skeleton-shimmer {
+    0% {
+      background-position: 200% 0;
+    }
+    100% {
+      background-position: -200% 0;
+    }
+  }
+  .animate-skeleton-shimmer {
+    background-image: linear-gradient(
+      90deg,
+      var(--muted) 25%,
+      color-mix(in oklch, var(--muted), var(--foreground) 10%) 50%,
+      var(--muted) 75%
+    );
+    background-size: 200% 100%;
+    animation: skeleton-shimmer 1.6s ease-in-out infinite;
+  }
+
+  /* Small horizontal shake for error toast icons. */
+  @keyframes toast-shake {
+    10%,
+    90% {
+      transform: translateX(-1px);
+    }
+    20%,
+    80% {
+      transform: translateX(2px);
+    }
+    30%,
+    50%,
+    70% {
+      transform: translateX(-3px);
+    }
+    40%,
+    60% {
+      transform: translateX(3px);
+    }
+  }
+  .animate-toast-shake {
+    animation: toast-shake 0.4s ease-in-out;
+  }
+}

@@ -59,6 +59,17 @@ export function CallDetailSheet({ call }: { call: CallDTO }) {
             </div>
           )}
 
+          {call.errorMessage && (
+            <div className="flex flex-col gap-1.5">
+              <span className="text-xs font-semibold uppercase tracking-wide text-destructive">
+                Error
+              </span>
+              <p className="rounded-lg bg-destructive/10 p-3 text-xs text-destructive">
+                {call.errorMessage}
+              </p>
+            </div>
+          )}
+
           {call.recordingUrl && (
             <div className="flex flex-col gap-1.5">
               <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -86,12 +97,12 @@ export function CallDetailSheet({ call }: { call: CallDTO }) {
                 ))}
               </div>
             </div>
-          ) : (
+          ) : !call.errorMessage ? (
             <p className="text-xs text-muted-foreground">
               No structured results yet — they land here once the call ends and Hunar delivers the
               result webhook.
             </p>
-          )}
+          ) : null}
 
           <div className="flex flex-col gap-1 border-t border-border pt-3 text-xs text-muted-foreground">
             <div>Placed: {new Date(call.createdAt).toLocaleString()}</div>

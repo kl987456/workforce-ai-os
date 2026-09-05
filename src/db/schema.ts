@@ -24,6 +24,7 @@ export const campaignKindEnum = pgEnum("campaign_kind", [
 export const candidateSourceEnum = pgEnum("candidate_source", [
   "MANUAL",
   "SEEDED_SEARCH",
+  "REACHOUT_SYNC",
 ]);
 
 export const callStatusEnum = pgEnum("call_status", [
@@ -82,6 +83,13 @@ export const candidates = pgTable("candidates", {
   matchScore: doublePrecision("match_score"),
   source: candidateSourceEnum("source").notNull().default("MANUAL"),
   profile: jsonb("profile"),
+  /** Set on rows auto-synced into a Hiring pipeline from a completed Talent Search
+   *  reachout call — plain ids (no FK) since both point at rows in these same two
+   *  tables and a real FK would make the schema mutually circular. */
+  sourceCallId: uuid("source_call_id"),
+  sourceCandidateId: uuid("source_candidate_id"),
+  isFavorite: boolean("is_favorite").notNull().default(false),
+  notes: text("notes"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -103,6 +111,7 @@ export const calls = pgTable("calls", {
   durationSeconds: doublePrecision("duration_seconds"),
   recordingUrl: text("recording_url"),
   result: jsonb("result"),
+  errorMessage: text("error_message"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   startedAt: timestamp("started_at", { withTimezone: true }),
   endedAt: timestamp("ended_at", { withTimezone: true }),

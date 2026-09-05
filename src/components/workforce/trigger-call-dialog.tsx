@@ -68,7 +68,13 @@ export function TriggerCallDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        setOpen(v);
+        if (!v) setPhone(candidate.phone);
+      }}
+    >
       <DialogTrigger asChild>
         <Button size="sm" className="gap-1.5">
           <Phone className="h-3.5 w-3.5" />
@@ -91,10 +97,14 @@ export function TriggerCallDialog({
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
             placeholder="+917411771293 or +15551234567"
+            aria-invalid={!!hint}
+            aria-describedby={hint ? "phone-error" : undefined}
             className={cn(hint && "border-destructive focus-visible:ring-destructive/40")}
           />
           {hint ? (
-            <p className="text-xs text-destructive">{hint}</p>
+            <p id="phone-error" className="text-xs text-destructive">
+              {hint}
+            </p>
           ) : (
             <p className="text-xs text-muted-foreground">
               Always starts with + and the country code — +91 for India, +1 for US/Canada, +44

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,17 +20,85 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, UserPlus, Mic, Users2, PhoneOutgoing, PhoneCall, ThumbsUp } from "lucide-react";
+import { Loader2, UserPlus, Mic, Users2, PhoneOutgoing, PhoneCall, ThumbsUp, Download } from "lucide-react";
 import { CampaignPicker } from "@/components/workforce/campaign-picker";
 import { CandidateTable } from "@/components/workforce/candidate-table";
+import { CustomizeAgentDialog } from "@/components/workforce/customize-agent-dialog";
 import { CallTable } from "@/components/workforce/call-table";
+import { TableSkeleton } from "@/components/workforce/table-skeleton";
 import { useCampaignWorkspace } from "@/components/workforce/use-campaign-workspace";
 import { StatTiles } from "@/components/workforce/stat-tiles";
 import { isE164, phoneHint } from "@/lib/phone";
 import { cn } from "@/lib/utils";
+import { toCsv, downloadCsv } from "@/lib/csv";
+import type { CallDTO, CampaignDTO, CandidateDTO } from "@/components/workforce/types";
 
-function NewRequisitionDialog({ onCreated }: { onCreated: (id: string) => void }) {
-  const [open, setOpen] = useState(false);
+// Turns a campaign title into a filesystem-safe slug for export filenames:
+// lowercase, whitespace runs to single hyphens, then strip anything left
+// that isn't a lowercase letter, digit, or hyphen.
+function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-]/g, "");
+}
+
+function formatDateYMD(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+// Summarizes a call's status plus any extracted result fields into one
+// human-readable string for a CSV cell, e.g. "COMPLETED — recommendation: advance".
+function formatCallSummary(call: CallDTO | undefined): string {
+  if (!call) return "";
+  const parts: string[] = [call.status];
+  if (call.result) {
+    const resultText = Object.entries(call.result)
+      .map(([key, value]) => `${key.replace(/_/g, " ")}: ${String(value)}`)
+      .join(", ");
+    if (resultText) parts.push(resultText);
+  }
+  return parts.join(" — ");
+}
+
+function exportCandidatesCsv(campaign: CampaignDTO, candidates: CandidateDTO[], calls: CallDTO[]) {
+  if (candidates.length === 0) {
+    toast.error("No candidates to export");
+    return;
+  }
+  const rows = candidates.map((c) => {
+    const latestCall = calls
+      .filter((call) => call.candidateId === c.id)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+    return {
+      name: c.name,
+      email: c.email ?? "",
+      phone: c.phone,
+      role: c.roleTitle ?? "",
+      location: c.location ?? "",
+      "years experience": c.yearsExperience ?? "",
+      skills: c.skills.join("; "),
+      isFavorite: c.isFavorite,
+      notes: c.notes ?? "",
+      "latest call summary": formatCallSummary(latestCall),
+    };
+  });
+  downloadCsv(`${slugify(campaign.title)}-candidates-${formatDateYMD(new Date())}.csv`, toCsv(rows));
+}
+
+function NewRequisitionDialog({
+  open,
+  onOpenChange,
+  onCreated,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onCreated: (id: string) => void;
+}) {
   const [title, setTitle] = useState("");
   const [department, setDepartment] = useState("");
   const [location, setLocation] = useState("");
@@ -60,11 +129,7 @@ function NewRequisitionDialog({ onCreated }: { onCreated: (id: string) => void }
         return;
       }
       toast.success("Requisition created");
-      setOpen(false);
-      setTitle("");
-      setDepartment("");
-      setLocation("");
-      setDescription("");
+      onOpenChange(false);
       onCreated(data.campaign.id);
     } finally {
       setLoading(false);
@@ -72,7 +137,18 @@ function NewRequisitionDialog({ onCreated }: { onCreated: (id: string) => void }
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        onOpenChange(v);
+        if (!v) {
+          setTitle("");
+          setDepartment("");
+          setLocation("");
+          setDescription("");
+        }
+      }}
+    >
       <DialogTrigger asChild>
         <Button variant="outline" size="sm" className="w-full">
           New requisition
@@ -112,7 +188,7 @@ function NewRequisitionDialog({ onCreated }: { onCreated: (id: string) => void }
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)} disabled={loading}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
             Cancel
           </Button>
           <Button onClick={handleCreate} disabled={loading}>
@@ -164,18 +240,29 @@ function AddCandidateDialog({
         return;
       }
       toast.success(`${name} added to pipeline`);
-      setOpen(false);
-      setName("");
-      setPhone("");
-      setEmail("");
+      resetAndClose();
       onAdded();
     } finally {
       setLoading(false);
     }
   }
 
+  function resetAndClose() {
+    setOpen(false);
+    setName("");
+    setPhone("");
+    setEmail("");
+    setRole(defaultRole);
+  }
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        if (v) setOpen(true);
+        else resetAndClose();
+      }}
+    >
       <DialogTrigger asChild>
         <Button size="sm" className="gap-1.5">
           <UserPlus className="h-3.5 w-3.5" /> Add candidate
@@ -201,10 +288,14 @@ function AddCandidateDialog({
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               placeholder="+917411771293 or +15551234567"
+              aria-invalid={!!hint}
+              aria-describedby={hint ? "c-phone-error" : undefined}
               className={cn(hint && "border-destructive focus-visible:ring-destructive/40")}
             />
             {hint ? (
-              <p className="text-xs text-destructive">{hint}</p>
+              <p id="c-phone-error" className="text-xs text-destructive">
+                {hint}
+              </p>
             ) : (
               <p className="text-xs text-muted-foreground">
                 + and country code, no spaces — +91 India, +1 US/Canada, +44 UK, etc.
@@ -221,7 +312,7 @@ function AddCandidateDialog({
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)} disabled={loading}>
+          <Button variant="outline" onClick={resetAndClose} disabled={loading}>
             Cancel
           </Button>
           <Button onClick={handleAdd} disabled={loading}>
@@ -234,10 +325,29 @@ function AddCandidateDialog({
   );
 }
 
-export default function HiringAssistantPage() {
-  const [activeId, setActiveId] = useState<string | null>(null);
+function HiringAssistantPageInner() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const campaignParam = searchParams.get("campaign");
+  const [activeId, setActiveIdState] = useState<string | null>(campaignParam);
   const [refreshToken, setRefreshToken] = useState(0);
+  const [newReqOpen, setNewReqOpen] = useState(false);
+  // Lifted to this always-mounted parent (rather than left uncontrolled on <Tabs>)
+  // so the selected tab survives the Tabs subtree unmounting/remounting whenever
+  // the workspace re-enters its loading state, e.g. switching requisitions.
+  const [tab, setTab] = useState("candidates");
   const { campaign, candidates, calls, loading, refresh } = useCampaignWorkspace(activeId);
+
+  // Keep in sync when the ?campaign= query param changes without a remount —
+  // e.g. selecting a different campaign from the command palette while already here.
+  useEffect(() => {
+    setActiveIdState((current) => (campaignParam !== current ? campaignParam : current));
+  }, [campaignParam]);
+
+  function setActiveId(id: string | null) {
+    setActiveIdState(id);
+    router.replace(id ? `/hiring-assistant?campaign=${id}` : "/hiring-assistant", { scroll: false });
+  }
 
   function bump() {
     setRefreshToken((t) => t + 1);
@@ -252,6 +362,8 @@ export default function HiringAssistantPage() {
           <h1 className="text-sm font-semibold">AI Hiring Assistant</h1>
         </div>
         <NewRequisitionDialog
+          open={newReqOpen}
+          onOpenChange={setNewReqOpen}
           onCreated={(id) => {
             bump();
             setActiveId(id);
@@ -262,7 +374,7 @@ export default function HiringAssistantPage() {
           kind="HIRING"
           activeId={activeId}
           onSelect={setActiveId}
-          onNew={() => {}}
+          onNew={() => setNewReqOpen(true)}
           onDeleted={(id) => {
             if (id === activeId) setActiveId(null);
           }}
@@ -288,6 +400,7 @@ export default function HiringAssistantPage() {
           <div className="flex flex-col gap-3">
             <Skeleton className="h-24 w-full" />
             <Skeleton className="h-32 w-full" />
+            <TableSkeleton columns={5} />
           </div>
         )}
 
@@ -303,7 +416,10 @@ export default function HiringAssistantPage() {
                         "No department/location set"}
                     </CardDescription>
                   </div>
-                  <AddCandidateDialog campaignId={campaign.id} defaultRole={campaign.title} onAdded={bump} />
+                  <div className="flex items-center gap-2">
+                    <CustomizeAgentDialog campaignId={campaign.id} purpose="HIRING_SCREEN" />
+                    <AddCandidateDialog campaignId={campaign.id} defaultRole={campaign.title} onAdded={bump} />
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>
@@ -340,7 +456,18 @@ export default function HiringAssistantPage() {
               ]}
             />
 
-            <Tabs defaultValue="candidates">
+            <div className="flex justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                onClick={() => exportCandidatesCsv(campaign, candidates, calls)}
+              >
+                <Download className="h-3.5 w-3.5" /> Export CSV
+              </Button>
+            </div>
+
+            <Tabs value={tab} onValueChange={setTab}>
               <TabsList>
                 <TabsTrigger value="candidates">
                   Candidate pipeline ({candidates.length})
@@ -366,5 +493,13 @@ export default function HiringAssistantPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function HiringAssistantPage() {
+  return (
+    <Suspense fallback={null}>
+      <HiringAssistantPageInner />
+    </Suspense>
   );
 }

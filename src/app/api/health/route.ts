@@ -8,7 +8,7 @@ export async function GET() {
   } catch (err) {
     return NextResponse.json(
       { hunar: "unreachable", error: err instanceof Error ? err.message : String(err) },
-      { status: 200 }
+      { status: 502 }
     );
   }
 }
